@@ -1,0 +1,117 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: pacman
+message: |
+  Pacman has been deployed on your project
+metadata:
+  name: pacman
+  annotations:
+    description: Use this template to deploy pacman web edition on your project
+    openshift.io/display-name: Pacman Wev edition
+    tags: game, pacman
+
+parameters:
+- name: APP_NAME
+  description: the name for the application instance
+  value: pacman
+  displayName: Application name
+- name: REPLICAS
+  description: number of pods to Provisioned
+  value: "1"
+
+objects:
+- kind: Route
+  apiVersion: route.openshift.io/v1
+  metadata:
+    name: ${APP_NAME}
+    labels:
+      app: ${APP_NAME}
+    annotations:
+      kubernetes.io/tls-acme: 'true'
+  spec:
+    port:
+      targetPort: http
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
+    to:
+      kind: Service
+      name: ${APP_NAME}
+
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: ${APP_NAME}
+    labels:
+      app: ${APP_NAME}
+      service: ${APP_NAME}
+      version: latest
+  spec:
+    ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+    selector:
+      dc: ${APP_NAME}
+
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: pacman
+    labels:
+      app: pacman
+  spec:
+    dockerImageRepository: dedaluscgregistry.azurecr.io
+    lookupPolicy:
+      local: false
+    tags:
+      - name: latest
+        importPolicy:
+          scheduled: true
+        from:
+          kind: DockerImage
+          name: 'hub.docker.com/r/uzyexe/pacman:latest'
+
+- kind: DeploymentConfig
+  apiVersion: v1
+  metadata:
+    name: ${APP_NAME}
+    labels:
+      app: ${APP_NAME}
+  spec:
+    replicas: ${{REPLICAS}}
+    selector:
+      dc: ${APP_NAME}
+    strategy:
+      type: Rolling
+    template:
+      metadata:
+        name: ${APP_NAME}
+        labels:
+          dc: ${APP_NAME}
+          app: ${APP_NAME}
+      spec:
+        containers:
+        - name: ${APP_NAME}
+          image: pacman:latest
+          imagePullPolicy: Always
+          ports:
+          - name: http
+            containerPort: 8080
+          resources:
+            limits:
+              cpu: 300m
+              memory: 300Mi
+        restartPolicy: Always
+        dnsPolicy: ClusterFirst
+    triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChangeParams:
+        automatic: true
+        containerNames:
+        - ${APP_NAME}
+        from:
+          kind: ImageStreamTag
+          name: pacman:latest
