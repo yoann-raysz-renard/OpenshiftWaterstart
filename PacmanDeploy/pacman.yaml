@@ -21,6 +21,9 @@ parameters:
   value: "1"
 
 objects:
+
+# The route object is used to inform the openshift router that a new public endpoint exist and that traffic should be redirecting
+# to the specified service
 - kind: Route
   apiVersion: route.openshift.io/v1
   metadata:
@@ -39,6 +42,8 @@ objects:
       kind: Service
       name: ${APP_NAME}
 
+# A service object is mandatory for internal cluster network, it is used to load balance requests between multiple instance of an application and
+# make the application pods reachable for other applications. 
 - kind: Service
   apiVersion: v1
   metadata:
@@ -55,6 +60,7 @@ objects:
     selector:
       dc: ${APP_NAME}
 
+# An image stream object abstract the location of a container image so it can be used easily in deployment objects
 - kind: ImageStream
   apiVersion: v1
   metadata:
@@ -69,10 +75,15 @@ objects:
       - name: latest
         importPolicy:
           scheduled: true
-        from:
-          kind: DockerImage
-          name: 'hub.docker.com/r/uzyexe/pacman:latest'
 
+# Deployment config object describe the way we want our applications to be deployed on the cluster.
+# An other common option is to use a Statefulset object instead.
+# It is in the specification of this object that we implement deployment operations such as:
+# - resources limits;
+# - pre deployment operation, like a migration;
+# - volume mounts;
+# - healtchecks;
+# - ...
 - kind: DeploymentConfig
   apiVersion: v1
   metadata:
